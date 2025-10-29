@@ -63,14 +63,18 @@ class CreateUser(BaseModel):
     role: str
     department: str
     attributes: Optional[Any] = None
+    class Config:
+        extra = 'ignore'
 
 
 class Document(BaseModel):
     id: Optional[int] = None
     title: str
     department: str
-    status: str
-    sensitivity: str
+    status: str = "draft"
+    sensitivity: str = "public"
+    class Config:
+        extra = 'ignore'
 
 class Policy(BaseModel):
     sub: str
