@@ -8,6 +8,9 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const [formData, setFormData] = useState({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
   const [statusMsg, setStatusMsg] = useState(null);
   const [statusType, setStatusType] = useState('info'); // 'success' | 'error' | 'info'
+  const [addPolicy, setAddPolicy] = useState(false);
+  const [policyRole, setPolicyRole] = useState('manager');
+  const [policyAction, setPolicyAction] = useState('read');
 
   useEffect(() => {
     loadDocuments();
@@ -40,11 +43,24 @@ function DocumentsTable({ currentRole = 'admin' }) {
         setStatusMsg('Укажите название документа');
         return;
       }
-      await api.post('/documents', formData);
+      const createResp = await api.post('/documents', formData);
       setShowForm(false);
       setFormData({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
       setStatusType('success');
       setStatusMsg('Документ создан');
+      // optionally add policy bound to dept/status of this doc
+      if (addPolicy) {
+        try {
+          await api.post('/policies', {
+            sub: policyRole,
+            dept: formData.department,
+            status: formData.status,
+            act: policyAction
+          });
+        } catch (e) {
+          console.warn('Policy create failed', e);
+        }
+      }
       loadDocuments();
     } catch (error) {
       const msg = (error && error.response && error.response.data && (error.response.data.detail || error.response.data.message)) || 'Ошибка при создании документа';
@@ -70,7 +86,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
           {statusMsg}
         </div>
       )}
-      
+
       <button
         onClick={() => setShowForm(!showForm)}
         style={{
@@ -135,6 +151,29 @@ function DocumentsTable({ currentRole = 'admin' }) {
             <option value="public">public</option>
             <option value="confidential">confidential</option>
           </select>
+
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #ccc' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={addPolicy} onChange={(e) => setAddPolicy(e.target.checked)} />
+              <span>Сразу добавить правило доступа для этого документа</span>
+            </label>
+            {addPolicy && (
+              <div style={{ marginTop: 8 }}>
+                <select value={policyRole} onChange={(e) => setPolicyRole(e.target.value)} style={{ padding: '8px 10px', marginRight: 8 }}>
+                  <option value="admin">admin</option>
+                  <option value="manager">manager</option>
+                  <option value="accountant">accountant</option>
+                  <option value="analyst">analyst</option>
+                  <option value="employee">employee</option>
+                  <option value="viewer">viewer</option>
+                </select>
+                <select value={policyAction} onChange={(e) => setPolicyAction(e.target.value)} style={{ padding: '8px 10px' }}>
+                  <option value="read">read</option>
+                </select>
+              </div>
+            )}
+          </div>
+
           <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', margin: '5px' }}>
             Сохранить
           </button>

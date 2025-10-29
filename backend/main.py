@@ -34,6 +34,23 @@ def get_db():
 # Initialize Casbin
 enforcer = casbin.Enforcer("./casbin_model.conf", "./casbin_policy.csv")
 
+# custom function: timeInRange("HH:MM", "HH:MM", hour:int)
+def time_in_range(start: str, end: str, hour: int) -> bool:
+    try:
+        if start == "*" or end == "*":
+            return True
+        s_h = int(start.split(":")[0])
+        e_h = int(end.split(":")[0])
+        h = int(hour)
+        if s_h <= e_h:
+            return s_h <= h <= e_h
+        # overnight window (e.g., 22:00-06:00)
+        return h >= s_h or h <= e_h
+    except Exception:
+        return True
+
+enforcer.add_function("timeInRange", time_in_range)
+
 # Pydantic Models
 class User(BaseModel):
     id: Optional[int] = None
@@ -57,8 +74,12 @@ class Document(BaseModel):
 
 class Policy(BaseModel):
     sub: str
-    obj: str
+    dept: str
+    status: str
     act: str
+    res: str
+    start: str
+    end: str
 
 class AccessRequest(BaseModel):
     user_role: str
@@ -92,8 +113,9 @@ async def check_access(
     if not doc:
         return {"allowed": False, "reason": "Document not found"}
     
-    # Check with Casbin
-    allowed = enforcer.enforce(user_role, doc["department"], doc["status"], action)
+    # Check with Casbin (resource documents + current hour UTC)
+    current_hour = datetime.utcnow().hour
+    allowed = enforcer.enforce(user_role, doc["department"], doc["status"], action, "documents", current_hour)
     
     # Log the decision
     cur.execute(
@@ -257,12 +279,15 @@ async def update_document(doc_id: int, doc: Document):
 async def get_policies():
     """Get all Casbin policies"""
     policies = enforcer.get_policy()
-    return {"policies": [{"sub": p[0], "obj": p[1], "act": p[2]} for p in policies]}
+    # policy row: [sub, dept, status, act, res, start, end]
+    return {"policies": [
+        {"sub": p[0], "dept": p[1], "status": p[2], "act": p[3], "res": p[4], "start": p[5], "end": p[6]} for p in policies
+    ]}
 
 @app.post("/policies")
 async def add_policy(policy: Policy):
     """Add a new policy"""
-    enforcer.add_policy(policy.sub, policy.obj, policy.act)
+    enforcer.add_policy(policy.sub, policy.dept, policy.status, policy.act, policy.res, policy.start, policy.end)
     enforcer.save_policy()
     return {"message": "Policy added"}
 
@@ -271,17 +296,64 @@ async def remove_policy(request: Request):
     """Remove a policy"""
     body = await request.json()
     sub = body.get('sub')
-    obj = body.get('obj')
+    dept = body.get('dept')
+    status = body.get('status')
     act = body.get('act')
+    res = body.get('res')
+    start = body.get('start')
+    end = body.get('end')
     
-    if not all([sub, obj, act]):
+    if not all([sub, dept, status, act, res, start, end]):
         return {"message": "Policy data required"}
     
-    result = enforcer.remove_policy(sub, obj, act)
+    result = enforcer.remove_policy(sub, dept, status, act, res, start, end)
     if result:
         enforcer.save_policy()
         return {"message": "Policy removed"}
     return {"message": "Policy not found"}
+
+# ============= INTEGRATIONS =============
+
+@app.post("/integrations/connect")
+async def connect_integration(request: Request):
+    body = await request.json()
+    service = body.get("service")
+    if not service:
+        raise HTTPException(status_code=400, detail="service is required")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS integrations (
+            id SERIAL PRIMARY KEY,
+            service VARCHAR(100) UNIQUE,
+            connected_at TIMESTAMP
+        )
+    """)
+    cur.execute(
+        "INSERT INTO integrations (service, connected_at) VALUES (%s, now()) ON CONFLICT (service) DO UPDATE SET connected_at = EXCLUDED.connected_at",
+        (service,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"message": "Integration connected", "service": service}
+
+@app.get("/integrations")
+async def list_integrations():
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS integrations (
+            id SERIAL PRIMARY KEY,
+            service VARCHAR(100) UNIQUE,
+            connected_at TIMESTAMP
+        )
+    """)
+    cur.execute("SELECT service, connected_at FROM integrations ORDER BY service")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {"integrations": [dict(r) for r in rows]}
 
 # ============= LOGS =============
 

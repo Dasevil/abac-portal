@@ -5,6 +5,9 @@ import DocumentsTable from './components/DocumentsTable';
 import PoliciesTable from './components/PoliciesTable';
 import LogsViewer from './components/LogsViewer';
 import VisibilityInfo from './components/VisibilityInfo';
+import TablesAccess from './components/TablesAccess';
+import IntegrationsPanel from './components/IntegrationsPanel';
+import AdminPanel from './components/AdminPanel';
 
 function App() {
   const [activeTab, setActiveTab] = useState('test');
@@ -18,6 +21,9 @@ function App() {
     { id: 'test', label: '🔑 Тест ABAC' },
     { id: 'users', label: '🧑 Пользователи' },
     { id: 'docs', label: '📄 Документы' },
+    { id: 'tables', label: '📚 Таблицы' },
+    { id: 'integrations', label: '🔌 Интеграции' },
+    { id: 'admin', label: '🛠️ Админка' },
     { id: 'policies', label: '⚙️ Политики' },
     { id: 'logs', label: '📊 Логи' }
   ];
@@ -75,6 +81,9 @@ function App() {
         {activeTab === 'test' && <AccessTester />}
         {activeTab === 'users' && <UsersTable currentRole={currentRole} />}
         {activeTab === 'docs' && <DocumentsTable currentRole={currentRole} />}
+        {activeTab === 'tables' && <TablesAccess currentRole={currentRole} />}
+        {activeTab === 'integrations' && <IntegrationsPanel />}
+        {activeTab === 'admin' && <AdminPanel />}
         {activeTab === 'policies' && <PoliciesTable />}
         {activeTab === 'logs' && <LogsViewer />}
       </main>

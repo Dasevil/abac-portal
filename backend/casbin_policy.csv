@@ -1,8 +1,10 @@
-p,admin,*,*
-p,manager,sales,read
-p,manager,sales,draft,read
-p,employee,sales,approved,read
-p,viewer,sales,approved,read
-p,manager,engineering,read
-p,employee,engineering,draft,read
+p,admin,*,*,*,*,*
+p,manager,sales,*,read,documents,08:00,20:00
+p,manager,sales,draft,read,documents,08:00,20:00
+p,employee,sales,approved,read,documents,08:00,20:00
+p,viewer,sales,approved,read,documents,08:00,20:00
+p,manager,engineering,*,read,documents,08:00,20:00
+p,employee,engineering,draft,read,documents,08:00,20:00
+p,admin,*,*,*,gitlab,*,*
+p,admin,*,*,*,mediawiki,*,*
 

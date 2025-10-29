@@ -4,7 +4,7 @@ import api from '../api';
 function PoliciesTable() {
   const [policies, setPolicies] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ sub: '', obj: '', act: '' });
+  const [formData, setFormData] = useState({ sub: '', dept: '', status: '', act: '', res: '', start: '', end: '' });
 
   useEffect(() => {
     loadPolicies();
@@ -20,7 +20,7 @@ function PoliciesTable() {
     try {
       await api.post('/policies', formData);
       setShowForm(false);
-      setFormData({ sub: '', obj: '', act: '' });
+      setFormData({ sub: '', dept: '', status: '', act: '', res: '', start: '', end: '' });
       loadPolicies();
     } catch (error) {
       alert('Error adding policy');
@@ -30,7 +30,6 @@ function PoliciesTable() {
   const handleDelete = async (policy) => {
     if (window.confirm('Удалить политику?')) {
       try {
-        // FastAPI DELETE может принимать JSON в теле запроса через request.json()
         await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/policies`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -68,19 +67,43 @@ function PoliciesTable() {
             placeholder="Subject (роль)"
             value={formData.sub}
             onChange={(e) => setFormData({ ...formData, sub: e.target.value })}
-            style={{ padding: '10px', margin: '5px', width: '200px' }}
+            style={{ padding: '10px', margin: '5px', width: '180px' }}
           />
           <input
-            placeholder="Object (ресурс)"
-            value={formData.obj}
-            onChange={(e) => setFormData({ ...formData, obj: e.target.value })}
-            style={{ padding: '10px', margin: '5px', width: '200px' }}
+            placeholder="Department (* для всех)"
+            value={formData.dept}
+            onChange={(e) => setFormData({ ...formData, dept: e.target.value })}
+            style={{ padding: '10px', margin: '5px', width: '180px' }}
           />
           <input
-            placeholder="Action (действие)"
+            placeholder="Status (* для всех)"
+            value={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+            style={{ padding: '10px', margin: '5px', width: '160px' }}
+          />
+          <input
+            placeholder="Action (read/...)"
             value={formData.act}
             onChange={(e) => setFormData({ ...formData, act: e.target.value })}
-            style={{ padding: '10px', margin: '5px', width: '200px' }}
+            style={{ padding: '10px', margin: '5px', width: '140px' }}
+          />
+          <input
+            placeholder="Resource (documents/gitlab/mediawiki/*)"
+            value={formData.res}
+            onChange={(e) => setFormData({ ...formData, res: e.target.value })}
+            style={{ padding: '10px', margin: '5px', width: '240px' }}
+          />
+          <input
+            placeholder="Start (часы, HH:MM, * для всех)"
+            value={formData.start}
+            onChange={(e) => setFormData({ ...formData, start: e.target.value })}
+            style={{ padding: '10px', margin: '5px', width: '190px' }}
+          />
+          <input
+            placeholder="End (часы, HH:MM, * для всех)"
+            value={formData.end}
+            onChange={(e) => setFormData({ ...formData, end: e.target.value })}
+            style={{ padding: '10px', margin: '5px', width: '180px' }}
           />
           <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', margin: '5px' }}>
             Сохранить
@@ -92,8 +115,12 @@ function PoliciesTable() {
         <thead>
           <tr style={{ backgroundColor: '#f5f5f5' }}>
             <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Subject</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Object</th>
+            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Department</th>
+            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Status</th>
             <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Action</th>
+            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Resource</th>
+            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Start</th>
+            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>End</th>
             <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Действия</th>
           </tr>
         </thead>
@@ -101,8 +128,12 @@ function PoliciesTable() {
           {policies.map((policy, idx) => (
             <tr key={idx}>
               <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.sub}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.obj}</td>
+              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.dept}</td>
+              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.status}</td>
               <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.act}</td>
+              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.res}</td>
+              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.start}</td>
+              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{policy.end}</td>
               <td style={{ padding: '10px', border: '1px solid #ddd' }}>
                 <button
                   onClick={() => handleDelete(policy)}
