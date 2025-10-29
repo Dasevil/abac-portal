@@ -12,8 +12,14 @@ function DocumentsTable({ currentRole = 'admin' }) {
   }, []);
 
   const loadDocuments = async () => {
-    const response = await api.get('/docs');
-    setDocuments(response.data.documents);
+    try {
+      const response = await api.get('/docs');
+      const docs = (response && response.data && Array.isArray(response.data.documents)) ? response.data.documents : [];
+      setDocuments(docs);
+    } catch (err) {
+      console.error('Error loading documents:', err);
+      setDocuments([]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -92,7 +98,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
         <thead>
           <tr style={{ backgroundColor: '#f5f5f5' }}>
             {visible.includes('id') && (
-              <th style={{ padding: '10px,', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
             )}
             {visible.includes('title') && (
               <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Название</th>
@@ -109,7 +115,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
           </tr>
         </thead>
         <tbody>
-          {documents.map(doc => (
+          {(Array.isArray(documents) ? documents : []).map(doc => (
             <tr key={doc.id}>
               {visible.includes('id') && (
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.id}</td>
