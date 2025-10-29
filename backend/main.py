@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
+import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
@@ -14,7 +15,10 @@ app = FastAPI(title="ABAC Portal API", version="1.0.0")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +41,12 @@ class User(BaseModel):
     role: str
     department: str
     attributes: Optional[dict] = None
+class CreateUser(BaseModel):
+    username: str
+    role: str
+    department: str
+    attributes: Optional[Any] = None
+
 
 class Document(BaseModel):
     id: Optional[int] = None
@@ -119,13 +129,25 @@ async def get_users(X_User_Role: Optional[str] = Header(None)):
     return {"users": filtered}
 
 @app.post("/users")
-async def create_user(user: User):
+async def create_user(user: CreateUser):
     """Create a new user"""
     conn = get_db()
     cur = conn.cursor()
+    # Normalize attributes: accept dict or JSON string
+    attrs: dict = {}
+    if user.attributes is not None:
+        if isinstance(user.attributes, dict):
+            attrs = user.attributes
+        elif isinstance(user.attributes, str):
+            try:
+                parsed = json.loads(user.attributes)
+                if isinstance(parsed, dict):
+                    attrs = parsed
+            except Exception:
+                attrs = {}
     cur.execute(
         "INSERT INTO users (username, role, department, attributes) VALUES (%s, %s, %s, %s) RETURNING id",
-        (user.username, user.role, user.department, str(user.attributes) if user.attributes else "{}")
+        (user.username, user.role, user.department, json.dumps(attrs))
     )
     user_id = cur.fetchone()[0]
     conn.commit()
