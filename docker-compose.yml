@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: abac-postgres
+    environment:
+      POSTGRES_USER: abac
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: abac_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U abac"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: abac-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://abac:secret@postgres:5432/abac_db
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 5000 --reload
+
+  frontend:
+    build: ./frontend
+    container_name: abac-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+
+volumes:
+  pgdata:
+

@@ -1,0 +1,8 @@
+p,admin,*,*
+p,manager,sales,read
+p,manager,sales,draft,read
+p,employee,sales,approved,read
+p,viewer,sales,approved,read
+p,manager,engineering,read
+p,employee,engineering,draft,read
+
