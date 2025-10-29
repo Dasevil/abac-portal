@@ -4,6 +4,7 @@ import UsersTable from './components/UsersTable';
 import DocumentsTable from './components/DocumentsTable';
 import PoliciesTable from './components/PoliciesTable';
 import LogsViewer from './components/LogsViewer';
+import VisibilityInfo from './components/VisibilityInfo';
 
 function App() {
   const [activeTab, setActiveTab] = useState('test');
@@ -70,6 +71,7 @@ function App() {
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px' }}>
+        <VisibilityInfo currentRole={currentRole} />
         {activeTab === 'test' && <AccessTester />}
         {activeTab === 'users' && <UsersTable currentRole={currentRole} />}
         {activeTab === 'docs' && <DocumentsTable currentRole={currentRole} />}

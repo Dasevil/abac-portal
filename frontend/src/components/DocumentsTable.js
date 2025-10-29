@@ -6,6 +6,8 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const [documents, setDocuments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
+  const [statusMsg, setStatusMsg] = useState(null);
+  const [statusType, setStatusType] = useState('info'); // 'success' | 'error' | 'info'
 
   useEffect(() => {
     loadDocuments();
@@ -33,12 +35,21 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      if (!formData.title.trim()) {
+        setStatusType('error');
+        setStatusMsg('Укажите название документа');
+        return;
+      }
       await api.post('/documents', formData);
       setShowForm(false);
       setFormData({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
+      setStatusType('success');
+      setStatusMsg('Документ создан');
       loadDocuments();
     } catch (error) {
-      alert('Error creating document');
+      const msg = (error && error.response && error.response.data && (error.response.data.detail || error.response.data.message)) || 'Ошибка при создании документа';
+      setStatusType('error');
+      setStatusMsg(msg);
     }
   };
 
@@ -47,6 +58,18 @@ function DocumentsTable({ currentRole = 'admin' }) {
   return (
     <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
       <h2 style={{ marginBottom: '20px', color: '#333' }}>Документы</h2>
+      {statusMsg && (
+        <div style={{
+          marginBottom: '16px',
+          padding: '12px 14px',
+          borderRadius: '6px',
+          color: statusType === 'error' ? '#b71c1c' : statusType === 'success' ? '#1b5e20' : '#0d47a1',
+          backgroundColor: statusType === 'error' ? '#ffebee' : statusType === 'success' ? '#e8f5e9' : '#e3f2fd',
+          border: '1px solid ' + (statusType === 'error' ? '#ffcdd2' : statusType === 'success' ? '#c8e6c9' : '#90caf9')
+        }}>
+          {statusMsg}
+        </div>
+      )}
       
       <button
         onClick={() => setShowForm(!showForm)}
@@ -61,6 +84,22 @@ function DocumentsTable({ currentRole = 'admin' }) {
         }}
       >
         {showForm ? 'Отмена' : '➕ Добавить документ'}
+      </button>
+
+      <button
+        onClick={loadDocuments}
+        style={{
+          padding: '10px 14px',
+          backgroundColor: '#2196F3',
+          color: 'white',
+          border: 'none',
+          borderRadius: '5px',
+          marginLeft: '10px',
+          marginBottom: '20px',
+          cursor: 'pointer'
+        }}
+      >
+        Обновить
       </button>
 
       {showForm && (
