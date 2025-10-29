@@ -5,7 +5,7 @@ import { columnVisibility } from '../visibilityConfig';
 function UsersTable({ currentRole = 'admin' }) {
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ username: '', role: 'employee', department: 'sales', attributes: '{}' });
+  const [formData, setFormData] = useState({ username: '', role: 'employee', department: 'sales' });
 
   useEffect(() => {
     loadUsers();
@@ -19,9 +19,14 @@ function UsersTable({ currentRole = 'admin' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/users', formData);
+      const payload = {
+        username: formData.username,
+        role: formData.role,
+        department: formData.department
+      };
+      await api.post('/users', payload);
       setShowForm(false);
-      setFormData({ username: '', role: 'employee', department: 'sales', attributes: '{}' });
+      setFormData({ username: '', role: 'employee', department: 'sales' });
       loadUsers();
     } catch (error) {
       alert('Error creating user');
