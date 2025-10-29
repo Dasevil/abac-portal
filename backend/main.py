@@ -6,6 +6,7 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import casbin
 import os
 
@@ -34,20 +35,40 @@ def get_db():
 # Initialize Casbin
 enforcer = casbin.Enforcer("./casbin_model.conf", "./casbin_policy.csv")
 
-# custom function: timeInRange("HH:MM", "HH:MM", hour:int)
-def time_in_range(start: str, end: str, hour: int) -> bool:
-    try:
-        if start == "*" or end == "*":
-            return True
-        s_h = int(start.split(":")[0])
-        e_h = int(end.split(":")[0])
-        h = int(hour)
-        if s_h <= e_h:
-            return s_h <= h <= e_h
-        # overnight window (e.g., 22:00-06:00)
-        return h >= s_h or h <= e_h
-    except Exception:
+# custom function: timeInRange("HH[:MM]", "HH[:MM]", current:"HH[:MM]"|int)
+def time_in_range(start: str, end: str, current: any) -> bool:
+    def parse_hhmm(value: str) -> int:
+        parts = value.strip().split(":")
+        if len(parts) == 1:
+            h = int(parts[0])
+            m = 0
+        else:
+            h = int(parts[0])
+            m = int(parts[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError("time out of range")
+        return h * 60 + m
+
+    if start == "*" or end == "*":
         return True
+
+    try:
+        # current may be int hour or string "HH[:MM]"
+        if isinstance(current, int):
+            current_str = f"{current:02d}:00"
+        else:
+            current_str = str(current)
+        s_min = parse_hhmm(start)
+        e_min = parse_hhmm(end)
+        c_min = parse_hhmm(current_str)
+
+        if s_min <= e_min:
+            return s_min <= c_min <= e_min
+        # overnight window (e.g., 22:00-06:00)
+        return c_min >= s_min or c_min <= e_min
+    except Exception:
+        # On parsing error, be safe and deny
+        return False
 
 enforcer.add_function("timeInRange", time_in_range)
 
@@ -91,6 +112,13 @@ class AccessRequest(BaseModel):
     action: str
     document_id: int
 
+class AccessWebRequest(BaseModel):
+    user_role: str
+    action: str
+    service: str  # e.g., github, gitlab, mediawiki
+    user_department: Optional[str] = "*"
+    document_status: Optional[str] = "*"
+
 # ============= AUTH / ACCESS CONTROL =============
 
 @app.post("/auth")
@@ -118,13 +146,14 @@ async def check_access(
         return {"allowed": False, "reason": "Document not found"}
     
     # Check with Casbin (resource documents + current hour UTC)
-    current_hour = datetime.utcnow().hour
-    allowed = enforcer.enforce(user_role, doc["department"], doc["status"], action, "documents", current_hour)
+    tz_name = os.getenv("ABAC_TZ", "UTC")
+    current_time = datetime.now(ZoneInfo(tz_name)).strftime("%H:%M")
+    result, explains = enforcer.enforce_ex(user_role, doc["department"], doc["status"], action, "documents", current_time)
     
     # Log the decision
     cur.execute(
         "INSERT INTO access_logs (user_id, action, resource, decision) VALUES (%s, %s, %s, %s)",
-        (None, f"{action} on doc {doc_id}", f"document_{doc_id}", allowed)
+        (None, f"{action} on doc {doc_id}", f"document_{doc_id}", bool(result))
     )
     conn.commit()
     
@@ -132,8 +161,9 @@ async def check_access(
     conn.close()
     
     return {
-        "allowed": allowed,
-        "reason": "Access granted" if allowed else "Access denied by policy",
+        "allowed": bool(result),
+        "reason": "Access granted" if result else "Access denied by policy",
+        "explain": explains,
         "document": dict(doc)
     }
 
@@ -208,24 +238,56 @@ async def delete_user(user_id: int):
 
 # ============= DOCUMENTS =============
 
-VISIBILITY = {
-    "users": {
-        "admin": ["id", "username", "role", "department", "attributes"],
-        "accountant": ["id", "username", "department"],
-        "analyst": ["id", "username", "department"],
-        "manager": ["id", "username", "role", "department"],
-        "employee": ["id", "username", "department"],
-        "viewer": ["username", "department"],
-    },
-    "documents": {
-        "admin": ["id", "title", "department", "status", "sensitivity"],
-        "accountant": ["id", "title", "sensitivity"],
-        "analyst": ["id", "title", "status"],
-        "manager": ["id", "title", "department", "status"],
-        "employee": ["id", "title", "department"],
+VISIBILITY = {"users": {}, "documents": {}}
+
+def load_visibility_from_db() -> None:
+    global VISIBILITY
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS column_policies (
+                id SERIAL PRIMARY KEY,
+                resource VARCHAR(50) NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                columns TEXT[] NOT NULL
+            )
+            """
+        )
+        cur.execute("SELECT resource, role, columns FROM column_policies")
+        rows = cur.fetchall()
+        policies: dict = {"users": {}, "documents": {}}
+        for r in rows:
+            res = r["resource"]
+            role = r["role"].lower()
+            cols = r["columns"]
+            if res not in policies:
+                policies[res] = {}
+            policies[res][role] = cols
+        # Fallbacks if table empty
+        if not policies["users"]:
+            policies["users"] = {
+                "admin": ["id","username","role","department","attributes"],
+                "accountant": ["id","username","department"],
+                "analyst": ["id","username","department"],
+                "manager": ["id","username","role","department"],
+                "employee": ["id","username","department"],
+                "viewer": ["username","department"],
+            }
+        if not policies["documents"]:
+            policies["documents"] = {
+                "admin": ["id","title","department","status","sensitivity"],
+                "accountant": ["id","title","sensitivity"],
+                "analyst": ["id","title","status"],
+                "manager": ["id","title","department","status"],
+                "employee": ["id","title","department"],
         "viewer": ["title"],
-    },
 }
+        VISIBILITY = policies
+    finally:
+        cur.close()
+        conn.close()
 
 
 def filter_fields(items, allowed):
@@ -284,6 +346,7 @@ def ensure_schema():
     conn.commit()
     cur.close()
     conn.close()
+    load_visibility_from_db()
 
 
 @app.get("/documents")
@@ -333,7 +396,7 @@ async def update_document(doc_id: int, doc: Document):
 @app.get("/policies")
 async def get_policies():
     """Get all Casbin policies"""
-    policies = enforcer.get_policy()
+    policies = [p for p in enforcer.get_policy() if isinstance(p, list) and len(p) >= 7]
     # policy row: [sub, dept, status, act, res, start, end]
     return {"policies": [
         {"sub": p[0], "dept": p[1], "status": p[2], "act": p[3], "res": p[4], "start": p[5], "end": p[6]} for p in policies
@@ -366,6 +429,69 @@ async def remove_policy(request: Request):
         enforcer.save_policy()
         return {"message": "Policy removed"}
     return {"message": "Policy not found"}
+
+@app.post("/policies/reload")
+async def reload_policies():
+    """Reload policies from the CSV adapter on disk."""
+    enforcer.load_policy()
+    policies = enforcer.get_policy()
+    return {"message": "Policies reloaded", "count": len(policies)}
+
+# ============= COLUMN POLICIES (COLUMN-BASED ACCESS) =============
+
+@app.get("/column-policies")
+async def get_column_policies():
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT resource, role, columns FROM column_policies ORDER BY resource, role")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {"column_policies": [dict(r) for r in rows]}
+
+class ColumnPolicy(BaseModel):
+    resource: str
+    role: str
+    columns: List[str]
+
+@app.post("/column-policies")
+async def upsert_column_policy(policy: ColumnPolicy):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS column_policies (
+            id SERIAL PRIMARY KEY,
+            resource VARCHAR(50) NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            columns TEXT[] NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        INSERT INTO column_policies (resource, role, columns)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (resource, role) DO UPDATE SET columns = EXCLUDED.columns
+        """,
+        (policy.resource, policy.role, policy.columns)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    load_visibility_from_db()
+    return {"message": "Column policy upserted"}
+
+@app.delete("/column-policies")
+async def delete_column_policy(resource: str, role: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM column_policies WHERE resource=%s AND role=%s", (resource, role))
+    conn.commit()
+    cur.close()
+    conn.close()
+    load_visibility_from_db()
+    return {"message": "Column policy deleted"}
 
 # ============= INTEGRATIONS =============
 
@@ -422,6 +548,32 @@ async def get_logs():
     cur.close()
     conn.close()
     return {"logs": [dict(log) for log in logs]}
+
+# ============= WEB RESOURCE AUTH =============
+
+@app.post("/auth/web")
+async def check_web_access(req: AccessWebRequest):
+    tz_name = os.getenv("ABAC_TZ", "UTC")
+    current_time = datetime.now(ZoneInfo(tz_name)).strftime("%H:%M")
+    result, explains = enforcer.enforce_ex(
+        req.user_role,
+        req.user_department or "*",
+        req.document_status or "*",
+        req.action,
+        req.service,
+        current_time,
+    )
+    # Log decision
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO access_logs (user_id, action, resource, decision) VALUES (%s,%s,%s,%s)",
+        (None, req.action, req.service, bool(result))
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"allowed": bool(result), "reason": "Access granted" if result else "Access denied by policy", "explain": explains}
 
 @app.get("/")
 async def root():
