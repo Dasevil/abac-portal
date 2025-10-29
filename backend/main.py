@@ -104,7 +104,7 @@ async def check_access(
 # ============= USERS =============
 
 @app.get("/users")
-async def get_users():
+async def get_users(X_User_Role: Optional[str] = Header(None)):
     """Get all users"""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -112,7 +112,11 @@ async def get_users():
     users = cur.fetchall()
     cur.close()
     conn.close()
-    return {"users": [dict(u) for u in users]}
+    role = (X_User_Role or "viewer").lower()
+    allowed = VISIBILITY["users"].get(role, VISIBILITY["users"]["viewer"]) 
+    # Remove attributes by default unless explicitly allowed
+    filtered = filter_fields(users, allowed)
+    return {"users": filtered}
 
 @app.post("/users")
 async def create_user(user: User):
@@ -156,8 +160,35 @@ async def delete_user(user_id: int):
 
 # ============= DOCUMENTS =============
 
+VISIBILITY = {
+    "users": {
+        "admin": ["id", "username", "role", "department", "attributes"],
+        "accountant": ["id", "username", "department"],
+        "analyst": ["id", "username", "department"],
+        "manager": ["id", "username", "role", "department"],
+        "employee": ["id", "username", "department"],
+        "viewer": ["username", "department"],
+    },
+    "documents": {
+        "admin": ["id", "title", "department", "status", "sensitivity"],
+        "accountant": ["id", "title", "sensitivity"],
+        "analyst": ["id", "title", "status"],
+        "manager": ["id", "title", "department", "status"],
+        "employee": ["id", "title", "department"],
+        "viewer": ["title"],
+    },
+}
+
+
+def filter_fields(items, allowed):
+    filtered = []
+    for it in items:
+        filtered.append({k: v for k, v in dict(it).items() if k in allowed})
+    return filtered
+
+
 @app.get("/docs")
-async def get_documents():
+async def get_documents(X_User_Role: Optional[str] = Header(None)):
     """Get all documents"""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -165,7 +196,9 @@ async def get_documents():
     docs = cur.fetchall()
     cur.close()
     conn.close()
-    return {"documents": [dict(d) for d in docs]}
+    role = (X_User_Role or "viewer").lower()
+    allowed = VISIBILITY["documents"].get(role, VISIBILITY["documents"]["viewer"])
+    return {"documents": filter_fields(docs, allowed)}
 
 @app.post("/docs")
 async def create_document(doc: Document):

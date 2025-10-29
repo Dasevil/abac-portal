@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AccessTester from './components/AccessTester';
 import UsersTable from './components/UsersTable';
 import DocumentsTable from './components/DocumentsTable';
@@ -7,6 +7,11 @@ import LogsViewer from './components/LogsViewer';
 
 function App() {
   const [activeTab, setActiveTab] = useState('test');
+  const [currentRole, setCurrentRole] = useState(() => localStorage.getItem('currentRole') || 'admin');
+
+  useEffect(() => {
+    localStorage.setItem('currentRole', currentRole);
+  }, [currentRole]);
 
   const tabs = [
     { id: 'test', label: '🔑 Тест ABAC' },
@@ -25,7 +30,8 @@ function App() {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <h1 style={{ marginBottom: '20px' }}>ABAC Portal - Attribute-Based Access Control</h1>
-        <nav style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <nav style={{ display: 'flex', gap: '10px' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -44,13 +50,29 @@ function App() {
               {tab.label}
             </button>
           ))}
-        </nav>
+          </nav>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontWeight: 'bold' }}>Текущая роль:</span>
+            <select
+              value={currentRole}
+              onChange={(e) => setCurrentRole(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: '5px', border: 'none', color: '#2196F3' }}
+            >
+              <option value="admin">admin</option>
+              <option value="manager">manager</option>
+              <option value="accountant">accountant</option>
+              <option value="analyst">analyst</option>
+              <option value="employee">employee</option>
+              <option value="viewer">viewer</option>
+            </select>
+          </div>
+        </div>
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px' }}>
         {activeTab === 'test' && <AccessTester />}
-        {activeTab === 'users' && <UsersTable />}
-        {activeTab === 'docs' && <DocumentsTable />}
+        {activeTab === 'users' && <UsersTable currentRole={currentRole} />}
+        {activeTab === 'docs' && <DocumentsTable currentRole={currentRole} />}
         {activeTab === 'policies' && <PoliciesTable />}
         {activeTab === 'logs' && <LogsViewer />}
       </main>

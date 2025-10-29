@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { columnVisibility } from '../visibilityConfig';
 
-function UsersTable() {
+function UsersTable({ currentRole = 'admin' }) {
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ username: '', role: 'employee', department: 'sales', attributes: '{}' });
@@ -33,6 +34,8 @@ function UsersTable() {
       loadUsers();
     }
   };
+
+  const visible = columnVisibility.users[currentRole] || columnVisibility.users.viewer;
 
   return (
     <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -89,28 +92,48 @@ function UsersTable() {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ backgroundColor: '#f5f5f5' }}>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Имя</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Роль</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Департамент</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Действия</th>
+            {visible.includes('id') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
+            )}
+            {visible.includes('username') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Имя</th>
+            )}
+            {visible.includes('role') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Роль</th>
+            )}
+            {visible.includes('department') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Департамент</th>
+            )}
+            {visible.includes('actions') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Действия</th>
+            )}
           </tr>
         </thead>
         <tbody>
           {users.map(user => (
             <tr key={user.id}>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.id}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.username}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.role}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.department}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                <button
-                  onClick={() => handleDelete(user.id)}
-                  style={{ padding: '5px 10px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
-                >
-                  Удалить
-                </button>
-              </td>
+              {visible.includes('id') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.id}</td>
+              )}
+              {visible.includes('username') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.username}</td>
+              )}
+              {visible.includes('role') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.role}</td>
+              )}
+              {visible.includes('department') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{user.department}</td>
+              )}
+              {visible.includes('actions') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    style={{ padding: '5px 10px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+                  >
+                    Удалить
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

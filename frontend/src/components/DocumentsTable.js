@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { columnVisibility } from '../visibilityConfig';
 
-function DocumentsTable() {
+function DocumentsTable({ currentRole = 'admin' }) {
   const [documents, setDocuments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
@@ -26,6 +27,8 @@ function DocumentsTable() {
       alert('Error creating document');
     }
   };
+
+  const visible = columnVisibility.documents[currentRole] || columnVisibility.documents.viewer;
 
   return (
     <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -88,31 +91,51 @@ function DocumentsTable() {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ backgroundColor: '#f5f5f5' }}>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Название</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Департамент</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Статус</th>
-            <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Конфиденциальность</th>
+            {visible.includes('id') && (
+              <th style={{ padding: '10px,', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
+            )}
+            {visible.includes('title') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Название</th>
+            )}
+            {visible.includes('department') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Департамент</th>
+            )}
+            {visible.includes('status') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Статус</th>
+            )}
+            {visible.includes('sensitivity') && (
+              <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Конфиденциальность</th>
+            )}
           </tr>
         </thead>
         <tbody>
           {documents.map(doc => (
             <tr key={doc.id}>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.id}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.title}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.department}</td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                <span style={{
-                  padding: '5px 10px',
-                  borderRadius: '3px',
-                  backgroundColor: doc.status === 'approved' ? '#4caf50' : '#ff9800',
-                  color: 'white',
-                  fontSize: '12px'
-                }}>
-                  {doc.status}
-                </span>
-              </td>
-              <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.sensitivity}</td>
+              {visible.includes('id') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.id}</td>
+              )}
+              {visible.includes('title') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.title}</td>
+              )}
+              {visible.includes('department') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.department}</td>
+              )}
+              {visible.includes('status') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                  <span style={{
+                    padding: '5px 10px',
+                    borderRadius: '3px',
+                    backgroundColor: doc.status === 'approved' ? '#4caf50' : '#ff9800',
+                    color: 'white',
+                    fontSize: '12px'
+                  }}>
+                    {doc.status}
+                  </span>
+                </td>
+              )}
+              {visible.includes('sensitivity') && (
+                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{doc.sensitivity}</td>
+              )}
             </tr>
           ))}
         </tbody>
