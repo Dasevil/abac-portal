@@ -14,7 +14,15 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const loadDocuments = async () => {
     try {
       const response = await api.get('/docs');
-      const docs = (response && response.data && Array.isArray(response.data.documents)) ? response.data.documents : [];
+      let docs = [];
+      if (response && response.data && response.data.documents != null) {
+        const payload = response.data.documents;
+        if (Array.isArray(payload)) {
+          docs = payload;
+        } else if (typeof payload === 'object') {
+          docs = Object.values(payload);
+        }
+      }
       setDocuments(docs);
     } catch (err) {
       console.error('Error loading documents:', err);
