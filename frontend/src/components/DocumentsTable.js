@@ -11,6 +11,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const [addPolicy, setAddPolicy] = useState(false);
   const [policyRole, setPolicyRole] = useState('manager');
   const [policyAction, setPolicyAction] = useState('read');
+  const defaultPolicyWindow = { start: '08:00', end: '20:00' };
 
   useEffect(() => {
     loadDocuments();
@@ -55,7 +56,10 @@ function DocumentsTable({ currentRole = 'admin' }) {
             sub: policyRole,
             dept: formData.department,
             status: formData.status,
-            act: policyAction
+            act: policyAction,
+            res: 'documents',
+            start: defaultPolicyWindow.start,
+            end: defaultPolicyWindow.end
           });
         } catch (e) {
           console.warn('Policy create failed', e);

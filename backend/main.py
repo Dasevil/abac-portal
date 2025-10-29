@@ -184,7 +184,7 @@ async def update_user(user_id: int, user: User):
     cur = conn.cursor()
     cur.execute(
         "UPDATE users SET username=%s, role=%s, department=%s, attributes=%s WHERE id=%s",
-        (user.username, user.role, user.department, str(user.attributes) if user.attributes else "{}", user_id)
+        (user.username, user.role, user.department, json.dumps(user.attributes or {}), user_id)
     )
     conn.commit()
     cur.close()
@@ -229,6 +229,57 @@ def filter_fields(items, allowed):
     for it in items:
         filtered.append({k: v for k, v in dict(it).items() if k in allowed})
     return filtered
+
+
+@app.on_event("startup")
+def ensure_schema():
+    conn = get_db()
+    cur = conn.cursor()
+    # create tables if not exists
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50),
+        role VARCHAR(50),
+        department VARCHAR(50),
+        attributes JSONB
+    );
+    CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(100),
+        department VARCHAR(50),
+        status VARCHAR(20),
+        sensitivity VARCHAR(20)
+    );
+    CREATE TABLE IF NOT EXISTS access_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INT,
+        action VARCHAR(50),
+        resource VARCHAR(50),
+        decision BOOLEAN,
+        timestamp TIMESTAMP DEFAULT now()
+    );
+    """)
+    # seed minimal data if empty
+    cur.execute("SELECT COUNT(*) FROM users")
+    users_cnt = cur.fetchone()[0]
+    if users_cnt == 0:
+        cur.execute(
+            "INSERT INTO users (username, role, department, attributes) VALUES (%s,%s,%s,%s),(%s,%s,%s,%s)",
+            ("john", "manager", "sales", json.dumps({"level": "senior"}),
+             "alice", "employee", "engineering", json.dumps({"level": "junior"}))
+        )
+    cur.execute("SELECT COUNT(*) FROM documents")
+    docs_cnt = cur.fetchone()[0]
+    if docs_cnt == 0:
+        cur.execute(
+            "INSERT INTO documents (title, department, status, sensitivity) VALUES (%s,%s,%s,%s),(%s,%s,%s,%s)",
+            ("Sales Report Q1", "sales", "approved", "confidential",
+             "Draft Proposal", "engineering", "draft", "public")
+        )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 @app.get("/documents")
