@@ -13,7 +13,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
 
   const loadDocuments = async () => {
     try {
-      const response = await api.get('/docs');
+      const response = await api.get('/documents');
       let docs = [];
       if (response && response.data && response.data.documents != null) {
         const payload = response.data.documents;
@@ -33,7 +33,7 @@ function DocumentsTable({ currentRole = 'admin' }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/docs', formData);
+      await api.post('/documents', formData);
       setShowForm(false);
       setFormData({ title: '', department: 'sales', status: 'draft', sensitivity: 'public' });
       loadDocuments();

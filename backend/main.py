@@ -209,7 +209,7 @@ def filter_fields(items, allowed):
     return filtered
 
 
-@app.get("/docs")
+@app.get("/documents")
 async def get_documents(X_User_Role: Optional[str] = Header(None)):
     """Get all documents"""
     conn = get_db()
@@ -222,7 +222,7 @@ async def get_documents(X_User_Role: Optional[str] = Header(None)):
     allowed = VISIBILITY["documents"].get(role, VISIBILITY["documents"]["viewer"])
     return {"documents": filter_fields(docs, allowed)}
 
-@app.post("/docs")
+@app.post("/documents")
 async def create_document(doc: Document):
     """Create a new document"""
     conn = get_db()
@@ -237,7 +237,7 @@ async def create_document(doc: Document):
     conn.close()
     return {"id": doc_id, "message": "Document created"}
 
-@app.put("/docs/{doc_id}")
+@app.put("/documents/{doc_id}")
 async def update_document(doc_id: int, doc: Document):
     """Update document"""
     conn = get_db()
